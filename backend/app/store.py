@@ -6,6 +6,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from app.lineage_seed import LINEAGE_SEED_ROWS, enrich_lineage_rows
 from app.seed import SEED_ROWS
 
 
@@ -14,6 +15,10 @@ class Store:
         self._tables: dict[str, list[dict[str, Any]]] = {
             name: [dict(row) for row in rows] for name, rows in SEED_ROWS.items()
         }
+        lineage = self._tables.setdefault("data_lineage", [])
+        lineage.extend(dict(row) for row in LINEAGE_SEED_ROWS)
+        # 旧示例也补齐生效时间/记录时间，版本定界查询对历史数据同样可用。
+        enrich_lineage_rows(lineage)
 
     def module_names(self) -> list[str]:
         return sorted(self._tables)

@@ -16,8 +16,11 @@
 │   └── vite.config.ts        dev server 配置（open: false）
 ├── backend/                  FastAPI（Python） 后端
 │   ├── app/routers/resource.py  通用查询/导出/登记/动作接口
+│   ├── app/routers/lineage.py   数据血缘版本定界查询/比对/版本定位接口
 │   ├── app/services/<key>.py    每个模块独立领域逻辑
 │   ├── app/services/base.py     共享服务骨架
+│   ├── app/lineage_seed.py      带生效时间/记录时间的血缘示例链路
+│   ├── tests/                   后端领域行为测试（pytest）
 │   └── app/store.py          内存数据仓库与示例数据
 ├── .gitignore
 └── docker-compose.yml
@@ -45,6 +48,38 @@ npm run dev
 
 前端默认监听 `http://127.0.0.1:5173/`，dev server 不会自动打开浏览器，
 需要自己访问。`/api` 由 vite 代理到后端 `http://127.0.0.1:8000`。
+
+### 测试
+
+```bash
+cd backend
+.venv/bin/python -m pytest tests -q
+```
+
+## 数据血缘：版本定界查询
+
+血缘链路同时带**生效时间**（valid time，关系在真实世界何时成立）和
+**记录时间**（transaction time，何时登记进平台）。页面入口：
+`/data_lineage` 的「版本定界血缘查询」，或直接访问 `/data_lineage/versioned`。
+
+两种用途各自取边、各自成图，不会混拼成同一条确定路径：
+
+| 用途 | 语义 | 日期条件 |
+| --- | --- | --- |
+| `report` 报告复现 | 复盘报告要看当时能用的路径 | 生效时间与记录时间都截断在报告时点，已撤销/已取代的不可见 |
+| `remediation` 整改核对 | 按如今已知的历史事实核对 | 只受生效时间约束，迟到补录可见，撤销与旧版本不可见 |
+
+相关接口：
+
+- `POST /api/data_lineage/query`：题目时点 + 起止实体，返回两种用途的路径；
+  同一时点重复请求复用同一查询号，不重复返回路径。
+- `POST /api/data_lineage/backfill`：补录迟到链路（声明生效日可早于今天，
+  登记时间默认今天）。
+- `GET /api/data_lineage/versions/{record_id}`：被撤销/重登记的关系仍按原记录
+  定位全部版本。
+- `POST /api/data_lineage/compare`：把版本定界结果同步到 `graph_compare` 待办，
+  存下对照请求日期，按真实新增/消失关系生成影响差异，并标注双方取数时点、
+  核对比对基准消费的记录与原报告可复现路径是否一致。
 
 ## 业务模块
 
